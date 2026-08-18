@@ -22,7 +22,6 @@ export default function HUD() {
   const boostTimeLeft = useGameStore(s => s.boostTimeLeft);
   const isGameOver = useGameStore(s => s.isGameOver);
   const resetYard = useGameStore(s => s.resetYard);
-  const autoCollect99Percent = useGameStore(s => s.autoCollect99Percent);
 
   return (
     <>      {/* Victory Screen */}
@@ -182,19 +181,6 @@ export default function HUD() {
         </div>
       </div>
 
-      {/* DEV Auto-Collect Button */}
-      <button
-        onClick={autoCollect99Percent}
-        style={{
-          position: 'absolute', bottom: 24, left: 24,
-          background: 'rgba(255, 0, 0, 0.7)',
-          border: '1px solid rgba(255, 255, 255, 0.5)', borderRadius: '8px',
-          color: '#fff', fontWeight: 800, fontSize: '12px',
-          padding: '8px 12px', cursor: 'pointer', pointerEvents: 'auto'
-        }}
-      >
-        DEV: Auto-Collect (Press E)
-      </button>
 
       {/* Shop and Settings buttons container */}
       <div style={{

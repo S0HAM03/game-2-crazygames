@@ -203,7 +203,7 @@ function Fountain({ position }) {
   );
 }
 
-// Neighborhood Dummy Houses around perimeter
+// Neighborhood Houses around perimeter (Highly Detailed)
 function DummyNeighborhood() {
   const dummyHouses = [
     // Left neighbor house
@@ -220,24 +220,97 @@ function DummyNeighborhood() {
     <group>
       {dummyHouses.map((h, i) => (
         <group key={i} position={h.pos} rotation={[0, h.rotY, 0]}>
-          {/* House body */}
+          {/* Main House Body */}
           <mesh position={[0, 2.5, 0]} castShadow>
             <boxGeometry args={[9, 5, 7]} />
             <meshStandardMaterial color={h.wallColor} roughness={0.9} />
           </mesh>
-          {/* Roof */}
-          <mesh position={[0, 6, 0]} castShadow>
-            <cylinderGeometry args={[0.01, 5.8, 2.5, 4, 1]} />
+
+          {/* Roof (Gabled/Pyramid Structure) */}
+          <mesh position={[0, 5.8, 0]} castShadow>
+            <cylinderGeometry args={[0.01, 5.5, 2.2, 4, 1]} />
             <meshStandardMaterial color={h.roofColor} roughness={0.8} />
           </mesh>
-          {/* Windows */}
-          <mesh position={[-2, 3, 3.51]}>
-            <boxGeometry args={[1.2, 1.4, 0.1]} />
-            <meshStandardMaterial color="#7090b0" transparent opacity={0.5} />
+
+          {/* Garage Extension */}
+          <mesh position={[-5.3, 1.6, 0.5]} castShadow>
+            <boxGeometry args={[3.2, 3.2, 5.0]} />
+            <meshStandardMaterial color={h.wallColor} roughness={0.9} />
           </mesh>
-          <mesh position={[2, 3, 3.51]}>
-            <boxGeometry args={[1.2, 1.4, 0.1]} />
-            <meshStandardMaterial color="#7090b0" transparent opacity={0.5} />
+          {/* Garage Sloped Roof */}
+          <mesh position={[-5.3, 3.3, 0.5]} rotation={[0, 0, 0.2]} castShadow>
+            <boxGeometry args={[3.4, 0.15, 5.2]} />
+            <meshStandardMaterial color={h.roofColor} roughness={0.8} />
+          </mesh>
+          {/* Garage Door (Closed Panel style) */}
+          <mesh position={[-5.3, 1.2, 3.01]} castShadow>
+            <boxGeometry args={[2.4, 2.4, 0.05]} />
+            <meshStandardMaterial color="#556677" roughness={0.7} />
+          </mesh>
+
+          {/* Chimney Stack */}
+          <mesh position={[2.6, 5.4, -1.6]} castShadow>
+            <boxGeometry args={[0.8, 2.2, 0.8]} />
+            <meshStandardMaterial color="#8d5c4b" roughness={0.95} />
+          </mesh>
+          {/* Chimney Cap */}
+          <mesh position={[2.6, 6.55, -1.6]} castShadow>
+            <boxGeometry args={[0.92, 0.1, 0.92]} />
+            <meshStandardMaterial color="#333333" />
+          </mesh>
+
+          {/* Front Entry Door */}
+          <mesh position={[1.2, 1.1, 3.51]} castShadow>
+            <boxGeometry args={[1.1, 2.2, 0.05]} />
+            <meshStandardMaterial color="#5d4037" roughness={0.8} />
+          </mesh>
+          {/* Porch Roof awning */}
+          <mesh position={[1.2, 2.4, 3.9]} rotation={[0.2, 0, 0]} castShadow>
+            <boxGeometry args={[1.6, 0.08, 0.8]} />
+            <meshStandardMaterial color={h.roofColor} />
+          </mesh>
+
+          {/* Windows with Cozy Glowing Lights inside! */}
+          {/* Front Windows */}
+          {[-2.2, 2.8].map((x, idx) => (
+            <group key={idx}>
+              {/* Window Frame */}
+              <mesh position={[x, 2.8, 3.52]} castShadow>
+                <boxGeometry args={[1.3, 1.4, 0.06]} />
+                <meshStandardMaterial color="#f5f5f5" roughness={0.9} />
+              </mesh>
+              {/* Glowing Warm Window Pane */}
+              <mesh position={[x, 2.8, 3.54]}>
+                <boxGeometry args={[1.18, 1.28, 0.04]} />
+                <meshStandardMaterial color="#ffe082" emissive="#ff9800" emissiveIntensity={0.65} roughness={0.1} />
+              </mesh>
+            </group>
+          ))}
+
+          {/* Side Windows */}
+          <group position={[4.52, 2.8, 0.0]} rotation={[0, Math.PI / 2, 0]}>
+            <mesh castShadow>
+              <boxGeometry args={[1.3, 1.4, 0.06]} />
+              <meshStandardMaterial color="#f5f5f5" roughness={0.9} />
+            </mesh>
+            <mesh position={[0, 0, 0.02]}>
+              <boxGeometry args={[1.18, 1.28, 0.04]} />
+              <meshStandardMaterial color="#ffe082" emissive="#ff9800" emissiveIntensity={0.65} roughness={0.1} />
+            </mesh>
+          </group>
+
+          {/* Neighbor Yard Shrubbery Decorations */}
+          <mesh position={[3.2, 0.5, 4.4]} castShadow>
+            <sphereGeometry args={[0.55, 8, 8]} />
+            <meshStandardMaterial color="#2e7d32" roughness={0.85} />
+          </mesh>
+          <mesh position={[4.0, 0.4, 4.4]} castShadow>
+            <sphereGeometry args={[0.4, 8, 8]} />
+            <meshStandardMaterial color="#388e3c" roughness={0.85} />
+          </mesh>
+          <mesh position={[-1.8, 0.45, 4.4]} castShadow>
+            <sphereGeometry args={[0.5, 8, 8]} />
+            <meshStandardMaterial color="#2e7d32" roughness={0.85} />
           </mesh>
         </group>
       ))}
@@ -245,15 +318,178 @@ function DummyNeighborhood() {
   );
 }
 
+function Cloud({ position, scale = 1 }) {
+  const ref = useRef();
+  const speed = useMemo(() => 0.015 + Math.random() * 0.015, []);
+  
+  useFrame(() => {
+    if (ref.current) {
+      ref.current.position.x += speed;
+      if (ref.current.position.x > 60) ref.current.position.x = -60;
+    }
+  });
+
+  return (
+    <group ref={ref} position={position} scale={scale}>
+      <mesh castShadow>
+        <sphereGeometry args={[2.2, 7, 7]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.9} flatShading />
+      </mesh>
+      <mesh position={[1.4, -0.4, 0.3]} castShadow>
+        <sphereGeometry args={[1.5, 6, 6]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.9} flatShading />
+      </mesh>
+      <mesh position={[-1.4, -0.5, -0.2]} castShadow>
+        <sphereGeometry args={[1.6, 6, 6]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.9} flatShading />
+      </mesh>
+    </group>
+  );
+}
+
+function SkyClouds() {
+  return (
+    <group>
+      <Cloud position={[-35, 18, -12]} scale={1.8} />
+      <Cloud position={[-10, 19, -25]} scale={1.5} />
+      <Cloud position={[15, 21, -18]} scale={2.1} />
+      <Cloud position={[40, 17, -10]} scale={1.6} />
+      <Cloud position={[-20, 20, 12]} scale={1.4} />
+      <Cloud position={[5, 18, 15]} scale={1.7} />
+      <Cloud position={[30, 22, 8]} scale={2.0} />
+    </group>
+  );
+}
+
+function Road() {
+  return (
+    <group position={[0, 0, 17.5]}>
+      {/* Main road surface */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} receiveShadow>
+        <planeGeometry args={[120, 6]} />
+        <meshStandardMaterial color="#2d3748" roughness={0.85} />
+      </mesh>
+      
+      {/* Dashed Center Yellow Line */}
+      {Array.from({ length: 25 }).map((_, i) => (
+        <mesh key={i} position={[-60 + i * 5, 0.012, 0]} receiveShadow>
+          <boxGeometry args={[1.5, 0.002, 0.12]} />
+          <meshStandardMaterial color="#f6e05e" roughness={0.9} />
+        </mesh>
+      ))}
+      
+      {/* Road Curb (Concrete divider along the yard boundary at Z = 14.5) */}
+      <mesh position={[0, 0.08, -3.1]} castShadow receiveShadow>
+        <boxGeometry args={[120, 0.16, 0.2]} />
+        <meshStandardMaterial color="#a0aec0" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+function Gate() {
+  return (
+    <group position={[0, 0, 14.5]}>
+      {/* Left Gate Post */}
+      <mesh position={[-1.7, 0.75, 0]} castShadow>
+        <boxGeometry args={[0.18, 1.5, 0.18]} />
+        <meshStandardMaterial color="#6d4c41" roughness={0.9} />
+      </mesh>
+      {/* Right Gate Post */}
+      <mesh position={[1.7, 0.75, 0]} castShadow>
+        <boxGeometry args={[0.18, 1.5, 0.18]} />
+        <meshStandardMaterial color="#6d4c41" roughness={0.9} />
+      </mesh>
+
+      {/* Left Gate Wing (Open angled) */}
+      <group position={[-1.7, 0, 0]} rotation={[0, Math.PI / 3, 0]}>
+        {/* Horizontal frame */}
+        <mesh position={[0.75, 0.9, 0.05]} castShadow>
+          <boxGeometry args={[1.5, 0.08, 0.05]} />
+          <meshStandardMaterial color="#a0704a" roughness={0.9} />
+        </mesh>
+        <mesh position={[0.75, 0.4, 0.05]} castShadow>
+          <boxGeometry args={[1.5, 0.08, 0.05]} />
+          <meshStandardMaterial color="#a0704a" roughness={0.9} />
+        </mesh>
+        {/* Diagonal brace */}
+        <mesh position={[0.75, 0.65, 0.06]} rotation={[0, 0, 0.5]} castShadow>
+          <boxGeometry args={[1.6, 0.06, 0.03]} />
+          <meshStandardMaterial color="#a0704a" roughness={0.9} />
+        </mesh>
+        {/* Vertical pickets */}
+        {Array.from({ length: 4 }).map((_, j) => (
+          <mesh key={j} position={[0.2 + j * 0.38, 0.65, 0.08]} castShadow>
+            <boxGeometry args={[0.08, 1.1, 0.03]} />
+            <meshStandardMaterial color="#bcaaa4" roughness={0.9} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Right Gate Wing (Open angled) */}
+      <group position={[1.7, 0, 0]} rotation={[0, -Math.PI / 3, 0]}>
+        {/* Horizontal frame */}
+        <mesh position={[-0.75, 0.9, 0.05]} castShadow>
+          <boxGeometry args={[1.5, 0.08, 0.05]} />
+          <meshStandardMaterial color="#a0704a" roughness={0.9} />
+        </mesh>
+        <mesh position={[-0.75, 0.4, 0.05]} castShadow>
+          <boxGeometry args={[1.5, 0.08, 0.05]} />
+          <meshStandardMaterial color="#a0704a" roughness={0.9} />
+        </mesh>
+        {/* Diagonal brace */}
+        <mesh position={[-0.75, 0.65, 0.06]} rotation={[0, 0, -0.5]} castShadow>
+          <boxGeometry args={[1.6, 0.06, 0.03]} />
+          <meshStandardMaterial color="#a0704a" roughness={0.9} />
+        </mesh>
+        {/* Vertical pickets */}
+        {Array.from({ length: 4 }).map((_, j) => (
+          <mesh key={j} position={[-0.2 - j * 0.38, 0.65, 0.08]} castShadow>
+            <boxGeometry args={[0.08, 1.1, 0.03]} />
+            <meshStandardMaterial color="#bcaaa4" roughness={0.9} />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+function StreetLamp({ position }) {
+  return (
+    <group position={position}>
+      {/* Pole */}
+      <mesh position={[0, 1.8, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.1, 3.6, 8]} />
+        <meshStandardMaterial color="#37474f" metalness={0.7} />
+      </mesh>
+      {/* Lamp Head */}
+      <mesh position={[0, 3.7, 0]} castShadow>
+        <cylinderGeometry args={[0.2, 0.1, 0.3, 8]} />
+        <meshStandardMaterial color="#212121" />
+      </mesh>
+      {/* Bulb (Emissive) */}
+      <mesh position={[0, 3.5, 0]}>
+        <sphereGeometry args={[0.12, 8, 8]} />
+        <meshStandardMaterial color="#ffe082" emissive="#ffb300" emissiveIntensity={2.5} />
+      </mesh>
+      {/* Light Source */}
+      <pointLight position={[0, 3.4, 0]} intensity={1.5} distance={12} color="#ffb300" castShadow />
+    </group>
+  );
+}
+
 function Fence() {
   const spacing = 2.2;
   const posts = [
-    // Front fence
-    ...Array.from({ length: 15 }, (_, i) => ({ pos: [-15.5 + i * spacing, 0, 14.5], rotY: 0 })),
+    // Front fence left segment (i = 0 to 6)
+    ...Array.from({ length: 6 }, (_, i) => ({ pos: [-15.5 + i * spacing, 0, 14.5], rotY: 0, hasRail: true })),
+    // Front fence right segment (i = 8 to 14)
+    ...Array.from({ length: 7 }, (_, i) => ({ pos: [2.1 + i * spacing, 0, 14.5], rotY: 0, hasRail: i < 6 })),
+    
     // Left fence
-    ...Array.from({ length: 14 }, (_, i) => ({ pos: [-15.5, 0, -5 + i * spacing], rotY: Math.PI / 2 })),
+    ...Array.from({ length: 14 }, (_, i) => ({ pos: [-15.5, 0, -5 + i * spacing], rotY: Math.PI / 2, hasRail: i < 13 })),
     // Right fence
-    ...Array.from({ length: 14 }, (_, i) => ({ pos: [15.5, 0, -5 + i * spacing], rotY: Math.PI / 2 })),
+    ...Array.from({ length: 14 }, (_, i) => ({ pos: [15.5, 0, -5 + i * spacing], rotY: Math.PI / 2, hasRail: i < 13 })),
   ];
 
   return (
@@ -264,54 +500,49 @@ function Fence() {
             <boxGeometry args={[0.12, 1.3, 0.12]} />
             <meshStandardMaterial color="#8b5e3c" roughness={0.9} />
           </mesh>
-          <mesh position={[spacing / 2, 0.85, 0]} castShadow>
-            <boxGeometry args={[spacing, 0.07, 0.06]} />
-            <meshStandardMaterial color="#a0704a" roughness={0.9} />
-          </mesh>
-          <mesh position={[spacing / 2, 0.5, 0]} castShadow>
-            <boxGeometry args={[spacing, 0.07, 0.06]} />
-            <meshStandardMaterial color="#a0704a" roughness={0.9} />
-          </mesh>
+          {p.hasRail && (
+            <>
+              <mesh position={[spacing / 2, 0.85, 0]} castShadow>
+                <boxGeometry args={[spacing, 0.07, 0.06]} />
+                <meshStandardMaterial color="#a0704a" roughness={0.9} />
+              </mesh>
+              <mesh position={[spacing / 2, 0.5, 0]} castShadow>
+                <boxGeometry args={[spacing, 0.07, 0.06]} />
+                <meshStandardMaterial color="#a0704a" roughness={0.9} />
+              </mesh>
+            </>
+          )}
         </group>
       ))}
     </group>
   );
 }
 
-function StonePath() {
-  const stones = [
-    [0, 4.5], [0, 3.0], [0.3, 1.5], [-0.2, 0],
-    [0.1, -1.5], [-0.1, -3.0], [0, -4.2],
-  ];
-  return (
-    <group>
-      {stones.map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.02, z]} rotation={[-Math.PI / 2, 0, (i % 3) * 0.3]} receiveShadow>
-          <boxGeometry args={[0.75 + (i % 3) * 0.1, 0.06, 0.55 + (i % 2) * 0.1]} />
-          <meshStandardMaterial color="#9e9e9e" roughness={0.95} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
+
 
 export default function Environment() {
   return (
     <>
+      {/* Volumetric Haze / Autumn Sunset Fog */}
+      <fog attach="fog" args={["#ffd1a4", 10, 45]} />
+
       <Sky
         distance={450000}
-        sunPosition={[120, 35, 80]}
-        inclination={0.48}
-        azimuth={0.25}
-        mieCoefficient={0.003}
-        mieDirectionalG={0.85}
+        sunPosition={[-60, 15, -45]}
+        inclination={0.52}
+        azimuth={0.2}
+        mieCoefficient={0.005}
+        mieDirectionalG={0.88}
       />
 
-      <ambientLight intensity={0.65} color="#fff6e5" />
+      {/* Cozy twilight ambient light */}
+      <ambientLight intensity={0.55} color="#b0bec5" />
+
+      {/* Cinematic Sunset Sun casting warm orange-gold shadows */}
       <directionalLight
-        position={[18, 24, 12]}
-        intensity={2.0}
-        color="#ffe2b3"
+        position={[-30, 18, -25]}
+        intensity={2.2}
+        color="#ff9b5c"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-25}
@@ -319,7 +550,9 @@ export default function Environment() {
         shadow-camera-top={25}
         shadow-camera-bottom={-25}
       />
-      <directionalLight position={[-12, 10, -8]} intensity={0.45} color="#b3d9ff" />
+
+      {/* Cyan Fill Light from the cool sky dome */}
+      <directionalLight position={[20, 10, 20]} intensity={0.4} color="#80deea" />
 
       {/* Main lawn */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
@@ -333,8 +566,13 @@ export default function Environment() {
         <meshStandardMaterial color="#42732a" roughness={1} />
       </mesh>
 
-      <StonePath />
+
       <Fence />
+      <Gate />
+      <Road />
+      <SkyClouds />
+      <StreetLamp position={[-2.4, 0, 14.1]} />
+      <StreetLamp position={[2.4, 0, 14.1]} />
       <DummyNeighborhood />
 
       {/* Decorations */}

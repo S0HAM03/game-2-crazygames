@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { usePlayerControls } from '../../hooks/usePlayerControls';
 import { useGameStore } from '../../store';
-import { playFlowerBell, startBackgroundMusic } from '../../audio/SoundSystem';
+import { playFlowerBell, startBackgroundMusic, playGrassFootstep } from '../../audio/SoundSystem';
 
 const MOVE_SPEED = 5.2;
 const BOUNDS = { minX: -14.5, maxX: 14.5, minZ: -4.8, maxZ: 14.2 };
@@ -14,17 +14,28 @@ const SPAWN_YAW = 0; // Facing into the house
 
 // Collision boxes for the house walls (absolute coordinates)
 const WALLS = [
-  { minX: -5.1, maxX: -1.5, minZ: -4.8, maxZ: -4.4 }, // Front wall left
-  { minX: 0.5, maxX: 5.1, minZ: -4.8, maxZ: -4.4 },   // Front wall right
-  { minX: -5.1, maxX: 5.1, minZ: -11.6, maxZ: -11.2 },// Back wall
-  { minX: 4.8, maxX: 5.2, minZ: -11.6, maxZ: -4.4 },  // Right wall
-  { minX: -5.2, maxX: -4.8, minZ: -11.6, maxZ: -4.4 },// Left wall (Divider)
-  { minX: 1.4, maxX: 1.6, minZ: -11.6, maxZ: -7.5 },  // Bedroom wall vert
-  { minX: 1.5, maxX: 5.1, minZ: -7.7, maxZ: -7.3 },   // Bedroom wall horiz
-  { minX: -9.1, maxX: -4.8, minZ: -11.1, maxZ: -10.7 },// Garage back
-  { minX: -9.1, maxX: -8.7, minZ: -11.1, maxZ: -4.9 }, // Garage left
-  { minX: -9.1, maxX: -6.8, minZ: -5.3, maxZ: -4.9 },  // Garage front left
-  { minX: -5.4, maxX: -4.8, minZ: -5.3, maxZ: -4.9 },  // Garage front right
+  // --- MAIN HOUSE ---
+  { minX: -6.1, maxX: -0.9, minZ: -4.1, maxZ: -3.9 },   // Front wall left
+  { minX: 0.9, maxX: 6.1, minZ: -4.1, maxZ: -3.9 },    // Front wall right
+  { minX: -6.1, maxX: 6.1, minZ: -12.1, maxZ: -11.9 },  // Back wall
+  { minX: 5.9, maxX: 6.1, minZ: -12.1, maxZ: -3.9 },   // Right wall
+  { minX: -6.1, maxX: -5.9, minZ: -12.1, maxZ: -3.9 },  // Divider wall (solid)
+
+  // --- GARAGE ---
+  { minX: -10.1, maxX: -5.9, minZ: -12.1, maxZ: -11.9 },// Garage back
+  { minX: -10.1, maxX: -9.9, minZ: -12.1, maxZ: -3.9 },  // Garage left
+  { minX: -10.1, maxX: -9.5, minZ: -4.1, maxZ: -3.9 },   // Garage front left column
+  { minX: -6.5, maxX: -5.9, minZ: -4.1, maxZ: -3.9 },    // Garage front right column
+
+  // --- INTERIOR ROOM WALLS ---
+  // Bedroom Z = -8.0 divider
+  { minX: 2.6, maxX: 6.1, minZ: -8.1, maxZ: -7.9 },
+  // Bedroom X = 1.5 divider
+  { minX: 1.4, maxX: 1.6, minZ: -12.1, maxZ: -7.9 },
+  // Bathroom Z = -8.0 divider
+  { minX: -6.1, maxX: -2.4, minZ: -8.1, maxZ: -7.9 },
+  // Bathroom X = -2.5 divider
+  { minX: -2.6, maxX: -2.4, minZ: -12.1, maxZ: -9.1 },
 ];
 
 function checkWallCollision(x, z) {
@@ -41,6 +52,8 @@ export default function FPPlayer() {
   const keys = usePlayerControls();
   const { camera, gl, scene, raycaster } = useThree();
   const hasVacuum = useGameStore(s => s.hasVacuum);
+  const hasBroom = useGameStore(s => s.hasBroom);
+  const isVacuuming = useGameStore(s => s.isVacuuming);
 
   const posRef = useRef(SPAWN_POS.clone());
   const yawRef = useRef(SPAWN_YAW);
@@ -50,6 +63,13 @@ export default function FPPlayer() {
   const vacuumDelayTimer = useRef(null);
   const holdingVacuum = useRef(false);
   const vacuumPitchOffset = useRef(0);
+  
+  const broomMeshRef = useRef();
+  const broomPitchOffset = useRef(-Math.PI / 12);
+  const broomSwingOffset = useRef(0);
+  const holdingLeftClick = useRef(false);
+  const lastFootstepTime = useRef(0);
+  
   const audioStarted = useRef(false);
 
   const setShopOpen = useGameStore(s => s.setShopOpen);
@@ -63,9 +83,6 @@ export default function FPPlayer() {
       if (e.code === 'Tab') {
         e.preventDefault();
         setShopOpen(!useGameStore.getState().isShopOpen);
-      }
-      if (e.code === 'KeyE' || e.key === 'e') {
-        useGameStore.getState().autoCollect99Percent();
       }
     };
     window.addEventListener('keydown', onKeyDown, { capture: true });
@@ -85,7 +102,11 @@ export default function FPPlayer() {
 
     const onLockChange = () => {
       isLockedRef.current = document.pointerLockElement === canvas;
-      if (!isLockedRef.current) useGameStore.getState().setVacuuming(false);
+      if (!isLockedRef.current) {
+        useGameStore.getState().setVacuuming(false);
+        useGameStore.getState().setSweeping(false);
+        holdingLeftClick.current = false;
+      }
     };
 
     const onMouseDown = (e) => {
@@ -97,6 +118,16 @@ export default function FPPlayer() {
       if (!isLockedRef.current) {
         canvas.requestPointerLock();
         return;
+      }
+
+      const isInsideHouse = posRef.current.z < -4.0 && posRef.current.x > -10.0 && posRef.current.x < 6.0;
+
+      // Handle Sweeping Hold (Left Click)
+      if (e.button === 0) {
+        const state = useGameStore.getState();
+        if (state.hasBroom) {
+          holdingLeftClick.current = true;
+        }
       }
 
       // Handle Vacuum (Right Click)
@@ -123,7 +154,8 @@ export default function FPPlayer() {
         for (const hit of hits) {
           const obj = hit.object;
 
-          if (obj.userData?.type === 'leaf-group' && hit.distance < 5.5) {
+          if (obj.userData?.type === 'leaf-group' && hit.distance < 2.8) {
+            if (isInsideHouse) break; // Block collecting through walls!
             const state = useGameStore.getState();
             if (state.isVacuuming) break; // Disable hand collect while vacuuming
             const colorIdx = obj.userData.colorIdx;
@@ -136,7 +168,8 @@ export default function FPPlayer() {
             break;
           }
 
-          if (obj.userData?.type === 'leaf' && hit.distance < 5.5) {
+          if (obj.userData?.type === 'leaf' && hit.distance < 2.8) {
+            if (isInsideHouse) break; // Block collecting through walls!
             const state = useGameStore.getState();
             if (!state.isVacuuming && window.__collectLeaf) window.__collectLeaf(obj.userData.leafId);
             break;
@@ -218,6 +251,10 @@ export default function FPPlayer() {
         if (vacuumDelayTimer.current) clearTimeout(vacuumDelayTimer.current);
         useGameStore.getState().setVacuuming(false);
       }
+      if (e.button === 0) {
+        holdingLeftClick.current = false;
+        useGameStore.getState().setSweeping(false);
+      }
     };
 
     document.addEventListener('mousemove', onMouseMove);
@@ -241,6 +278,15 @@ export default function FPPlayer() {
     const state = useGameStore.getState();
     if (state.isShopOpen || state.isSettingsOpen || state.isGameOver) return;
     
+    // Update sweeping state based on mouse hold
+    if (holdingLeftClick.current && state.hasBroom) {
+      if (!state.isShopOpen && !state.isSettingsOpen && !state.isGameOver) {
+        state.setSweeping(true);
+      }
+    } else {
+      state.setSweeping(false);
+    }
+
     // Passive Energy Drain
     if (t - lastEnergyDrain.current > 2.0) {
       state.consumeEnergy(1);
@@ -274,10 +320,10 @@ export default function FPPlayer() {
       const nextX = posRef.current.x + move.x * currentSpeed * delta;
       const nextZ = posRef.current.z + move.z * currentSpeed * delta;
 
-      // Expand bounds to allow entering the house back to z: -11.5
-      // Expanded BOUNDS internally: minX: -14.5, maxX: 14.5, minZ: -11.5, maxZ: 14.2
+      // Expand bounds to allow entering the house back to z: -11.8
+      // Expanded BOUNDS internally: minX: -14.5, maxX: 14.5, minZ: -11.8, maxZ: 14.2
       const clampedX = Math.max(-14.5, Math.min(14.5, nextX));
-      const clampedZ = Math.max(-11.5, Math.min(14.2, nextZ));
+      const clampedZ = Math.max(-11.8, Math.min(14.2, nextZ));
 
       // Check wall collisions (slide along walls)
       if (!checkWallCollision(clampedX, posRef.current.z)) {
@@ -285,6 +331,13 @@ export default function FPPlayer() {
       }
       if (!checkWallCollision(posRef.current.x, clampedZ)) {
         posRef.current.z = clampedZ;
+      }
+
+      // Play grass footstep sounds when outside
+      const isInside = posRef.current.z < -4.0 && posRef.current.x > -10.0 && posRef.current.x < 6.0;
+      if (!isInside && t - lastFootstepTime.current > 0.42) {
+        playGrassFootstep();
+        lastFootstepTime.current = t;
       }
     }
 
@@ -302,6 +355,21 @@ export default function FPPlayer() {
       vacuumMeshRef.current.quaternion.copy(camera.quaternion);
       vacuumMeshRef.current.rotateX(vacuumPitchOffset.current);
     }
+
+    if (broomMeshRef.current) {
+      const isSweeping = state.isSweeping;
+      // Animate broom: swing left/right using a sine wave, lower it down while sweeping
+      const swingAngle = isSweeping ? Math.sin(t * 12) * 0.45 : 0;
+      const targetPitch = isSweeping ? -Math.PI / 6 : -Math.PI / 12;
+      
+      broomPitchOffset.current = THREE.MathUtils.lerp(broomPitchOffset.current, targetPitch, 0.1);
+      broomSwingOffset.current = THREE.MathUtils.lerp(broomSwingOffset.current, swingAngle, 0.15);
+
+      broomMeshRef.current.position.copy(camera.position);
+      broomMeshRef.current.quaternion.copy(camera.quaternion);
+      broomMeshRef.current.rotateX(broomPitchOffset.current);
+      broomMeshRef.current.rotateY(broomSwingOffset.current);
+    }
   });
 
   return (
@@ -316,6 +384,26 @@ export default function FPPlayer() {
           <mesh position={[0.5, -1.1, -1.3]} rotation={[Math.PI / 8, -Math.PI / 16, 0]} castShadow>
             <cylinderGeometry args={[0.2, 0.25, 0.4, 12]} />
             <meshStandardMaterial color="#ff9800" metalness={0.6} />
+          </mesh>
+        </group>
+      )}
+
+      {hasBroom && !isVacuuming && (
+        <group ref={broomMeshRef}>
+          {/* Wooden Broom Handle extending from bottom right */}
+          <mesh position={[0.4, -0.7, -0.7]} rotation={[-Math.PI / 6, -Math.PI / 12, 0]} castShadow>
+            <cylinderGeometry args={[0.025, 0.025, 1.6, 8]} />
+            <meshStandardMaterial color="#8d6e63" roughness={0.9} />
+          </mesh>
+          {/* Wooden Brush Head Block */}
+          <mesh position={[0.4, -1.5, -1.3]} rotation={[0, 0, 0]} castShadow>
+            <boxGeometry args={[0.4, 0.08, 0.12]} />
+            <meshStandardMaterial color="#5d4037" roughness={0.9} />
+          </mesh>
+          {/* Yellow Bristles */}
+          <mesh position={[0.4, -1.6, -1.3]} rotation={[0, 0, 0]} castShadow>
+            <boxGeometry args={[0.38, 0.12, 0.1]} />
+            <meshStandardMaterial color="#ffee58" roughness={0.9} />
           </mesh>
         </group>
       )}

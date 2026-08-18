@@ -5,14 +5,82 @@ import { playBinDeposit } from '../../audio/SoundSystem';
 import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 
+// Absolute wall boundaries for line of sight occluding
+const OCCLUSION_WALLS = [
+  // --- MAIN HOUSE ---
+  { minX: -6.1, maxX: -0.9, minZ: -4.1, maxZ: -3.9 },   // Front wall left
+  { minX: 0.9, maxX: 6.1, minZ: -4.1, maxZ: -3.9 },    // Front wall right
+  { minX: -6.1, maxX: 6.1, minZ: -12.1, maxZ: -11.9 },  // Back wall
+  { minX: 5.9, maxX: 6.1, minZ: -12.1, maxZ: -3.9 },   // Right wall
+  { minX: -6.1, maxX: -5.9, minZ: -12.1, maxZ: -3.9 },  // Divider wall (solid)
+
+  // --- GARAGE ---
+  { minX: -10.1, maxX: -5.9, minZ: -12.1, maxZ: -11.9 },// Garage back
+  { minX: -10.1, maxX: -9.9, minZ: -12.1, maxZ: -3.9 },  // Garage left
+  { minX: -10.1, maxX: -9.5, minZ: -4.1, maxZ: -3.9 },   // Garage front left column
+  { minX: -6.5, maxX: -5.9, minZ: -4.1, maxZ: -3.9 },    // Garage front right column
+
+  // --- INTERIOR ROOM WALLS ---
+  // Bedroom Z = -8.0 divider
+  { minX: 2.6, maxX: 6.1, minZ: -8.1, maxZ: -7.9 },
+  // Bedroom X = 1.5 divider
+  { minX: 1.4, maxX: 1.6, minZ: -12.1, maxZ: -7.9 },
+  // Bathroom Z = -8.0 divider
+  { minX: -6.1, maxX: -2.4, minZ: -8.1, maxZ: -7.9 },
+  // Bathroom X = -2.5 divider
+  { minX: -2.6, maxX: -2.4, minZ: -12.1, maxZ: -9.1 },
+];
+
+function isLineOfSightBlocked(p1, p2) {
+  const x1 = p1.x;
+  const z1 = p1.z;
+  const x2 = p2.x;
+  const z2 = p2.z;
+
+  for (const w of OCCLUSION_WALLS) {
+    // 1. Vertical wall (X constant)
+    const wallX = (w.minX + w.maxX) / 2;
+    if ((x1 < wallX && x2 > wallX) || (x1 > wallX && x2 < wallX)) {
+      if (Math.abs(x2 - x1) > 0.0001) {
+        const t = (wallX - x1) / (x2 - x1);
+        const zInterp = z1 + (z2 - z1) * t;
+        if (zInterp >= w.minZ && zInterp <= w.maxZ) {
+          return true;
+        }
+      }
+    }
+
+    // 2. Horizontal wall (Z constant)
+    const wallZ = (w.minZ + w.maxZ) / 2;
+    if ((z1 < wallZ && z2 > wallZ) || (z1 > wallZ && z2 < wallZ)) {
+      if (Math.abs(z2 - z1) > 0.0001) {
+        const t = (wallZ - z1) / (z2 - z1);
+        const xInterp = x1 + (x2 - x1) * t;
+        if (xInterp >= w.minX && xInterp <= w.maxX) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 function ProximityTooltip({ position, text, showDistance = 4 }) {
   const [opacity, setOpacity] = useState(0);
   const ref = useRef();
+  const worldPos = useMemo(() => new THREE.Vector3(), []);
   
   useFrame(({ camera }) => {
     if (ref.current) {
-      const dist = camera.position.distanceTo(ref.current.getWorldPosition(new THREE.Vector3()));
-      const target = dist < showDistance ? 1 : 0;
+      const tooltipPos = ref.current.getWorldPosition(worldPos);
+      const dist = camera.position.distanceTo(tooltipPos);
+      let target = dist < showDistance ? 1 : 0;
+      
+      // If close, check line-of-sight to prevent displaying label through walls
+      if (target === 1 && isLineOfSightBlocked(camera.position, tooltipPos)) {
+        target = 0;
+      }
+      
       setOpacity(prev => THREE.MathUtils.lerp(prev, target, 0.15));
     }
   });
@@ -65,7 +133,7 @@ export default function CompostBin() {
 
   return (
     <group
-      position={[9, 0, 8]}
+      position={[2.4, 0, 13.6]}
       onClick={handleSell}
       onPointerOver={() => document.body.style.cursor = 'pointer'}
       onPointerOut={() => document.body.style.cursor = 'default'}

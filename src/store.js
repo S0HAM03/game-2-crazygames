@@ -45,9 +45,7 @@ export const useGameStore = create((set, get) => ({
   isSettingsOpen: false,
   isGameOver: false,
   notifications: [],
-  triggerDevCollect: 0,
 
-  autoCollect99Percent: () => set(s => ({ triggerDevCollect: s.triggerDevCollect + 1 })),
   setGameOver: (v) => set({ isGameOver: v }),
   resetYard: () => set((state) => ({
     isGameOver: false,
@@ -151,7 +149,9 @@ export const useGameStore = create((set, get) => ({
 
   // Vacuum System
   hasVacuum: false,
+  hasBroom: false,
   isVacuuming: false,
+  isSweeping: false,
   vacuumBattery: 90,
   maxVacuumBattery: 90,
   consumeBattery: (amount) => set((state) => ({
@@ -165,7 +165,12 @@ export const useGameStore = create((set, get) => ({
     if (state.coins < 500) return state;
     return { coins: state.coins - 500, hasVacuum: true, vacuumBattery: state.maxVacuumBattery };
   }),
+  buyBroom: () => set((state) => {
+    if (state.coins < 80) return state;
+    return { coins: state.coins - 80, hasBroom: true };
+  }),
   setVacuuming: (val) => set({ isVacuuming: val }),
+  setSweeping: (val) => set({ isSweeping: val }),
 
   // Boost System
   isBoosted: false,
