@@ -570,6 +570,12 @@ function VacuumProp({ position }) {
     }
     buyVacuum();
     addNotification('🎉 Vacuum Purchased! Hold RMB to vacuum.');
+    
+    const state = useGameStore.getState();
+    state.triggerVoiceOver(
+      "Wow, a vacuum cleaner. Time to clean this yard in style!",
+      "Wow, a vacuum cleaner. Time to clean this yard in style!"
+    );
   };
 
   return (
@@ -628,6 +634,12 @@ function BroomProp({ position }) {
     }
     buyBroom();
     addNotification('🎉 Broom Purchased! Hold LMB to sweep leaves.');
+    
+    const state = useGameStore.getState();
+    state.triggerVoiceOver(
+      "A sturdy broom! This will make gathering leaves much easier.",
+      "A sturdy broom! This will make gathering leaves much easier."
+    );
   };
 
   return (
@@ -669,6 +681,24 @@ export default function House() {
   const intWallMat = new THREE.MeshStandardMaterial({ color: '#fcfaf2', roughness: 0.9 });
   const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.6 });
   const garageFloorMat = new THREE.MeshStandardMaterial({ color: '#555555', roughness: 0.85 });
+
+  // Auto-detect player entering garage workshop
+  useFrame(({ camera }) => {
+    const x = camera.position.x;
+    const z = camera.position.z;
+    const isInsideGarage = x > -10.1 && x < -5.9 && z > -12.1 && z < -3.8;
+    
+    if (isInsideGarage) {
+      const state = useGameStore.getState();
+      if (state.gamePhase === 'playing' && !state.tutorialFlags.visitedGarage) {
+        state.completeTutorialFlag('visitedGarage');
+        state.triggerVoiceOver(
+          "Ah, the garage workshop. The old lawn tools should be around here somewhere.",
+          "Ah, the garage workshop. The old lawn tools should be around here somewhere."
+        );
+      }
+    }
+  });
 
   // Note: House center positioned at [0, 0, -8]
   return (

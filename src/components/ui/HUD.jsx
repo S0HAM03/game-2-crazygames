@@ -1,4 +1,14 @@
 import { useGameStore } from '../../store';
+import TutorialGuide from './TutorialGuide';
+import EndGameOverlay from './EndGameOverlay';
+
+function formatHHMMSS(seconds) {
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
 
 export default function HUD() {
   const coins = useGameStore(s => s.coins);
@@ -21,81 +31,29 @@ export default function HUD() {
   const isBoosted = useGameStore(s => s.isBoosted);
   const boostTimeLeft = useGameStore(s => s.boostTimeLeft);
   const isGameOver = useGameStore(s => s.isGameOver);
-  const resetYard = useGameStore(s => s.resetYard);
+  const timerSeconds = useGameStore(s => s.timerSeconds);
+  
+  const gamePhase = useGameStore(s => s.gamePhase);
+  const subtitleText = useGameStore(s => s.subtitleText);
+  const tutorialFlags = useGameStore(s => s.tutorialFlags);
+
+  if (gamePhase === 'start_menu') return null;
 
   return (
-    <>      {/* Victory Screen */}
-      {isGameOver && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(12px)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, color: 'white', fontFamily: "'Inter', 'Segoe UI', sans-serif",
-          animation: 'fadeIn 0.5s ease-out'
-        }}>
-          <div style={{
-            background: 'rgba(25, 25, 30, 0.85)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '24px',
-            padding: '60px 80px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-            maxWidth: '600px',
-            textAlign: 'center'
-          }}>
-            <h1 style={{ 
-              fontSize: '42px', color: '#ffffff', margin: '0 0 16px 0', 
-              fontWeight: 800, letterSpacing: '-0.5px' 
-            }}>
-              Yard Spotless
-            </h1>
-            <p style={{ 
-              fontSize: '18px', color: 'rgba(255,255,255,0.7)', marginBottom: '48px', 
-              fontWeight: 400, lineHeight: '1.6' 
-            }}>
-              You have cleaned your garden! Now your mom will tell you another work to do...
-            </p>
-            <div style={{ display: 'flex', gap: '16px', width: '100%' }}>
-              <button
-                onClick={resetYard}
-                style={{
-                  flex: 1, background: '#ffffff', border: 'none', borderRadius: '12px', padding: '16px 0',
-                  color: '#000000', fontWeight: 600, fontSize: '16px', cursor: 'pointer',
-                  transition: 'transform 0.2s, background 0.2s', pointerEvents: 'auto'
-                }}
-                onMouseEnter={e => { e.target.style.transform = 'translateY(-2px)'; e.target.style.background = '#f0f0f0'; }}
-                onMouseLeave={e => { e.target.style.transform = 'translateY(0)'; e.target.style.background = '#ffffff'; }}
-              >
-                Play Again
-              </button>
-              <button
-                onClick={() => window.close()}
-                style={{
-                  flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '12px', padding: '16px 0', color: '#fff',
-                  fontWeight: 600, fontSize: '16px', cursor: 'pointer', transition: 'background 0.2s',
-                  pointerEvents: 'auto'
-                }}
-                onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.1)'}
-                onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.05)'}
-              >
-                Exit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <>
+      {/* End Game Victory / Failure Overlay */}
+      <EndGameOverlay />
 
       {/* Top HUD Bar */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '10px 20px',
-        background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 100%)',
+        padding: '12px 24px',
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, transparent 100%)',
         pointerEvents: 'none',
-        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, sans-serif",
         color: '#fff',
+        zIndex: 50,
       }}>
         {/* Left: Bag & Energy status */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -153,19 +111,31 @@ export default function HUD() {
           )}
         </div>
 
-        {/* Center: Title & Boost */}
+        {/* Center: Title & 8-Hour Countdown Timer */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ fontWeight: 900, fontSize: '22px', letterSpacing: '2px', textShadow: '0 2px 8px rgba(0,0,0,0.7)', opacity: 0.9 }}>
+          <div style={{ fontWeight: 900, fontSize: '20px', letterSpacing: '2px', textShadow: '0 2px 8px rgba(0,0,0,0.7)', opacity: 0.9 }}>
             🍂 LEAF IT ALONE
           </div>
+          
+          {/* 8-Hour Timer Badge */}
+          <div style={{
+            marginTop: '4px',
+            background: timerSeconds < 1800 ? 'rgba(239,83,80,0.35)' : 'rgba(205,127,50,0.25)',
+            border: `1px solid ${timerSeconds < 1800 ? '#ef5350' : 'rgba(205,127,50,0.5)'}`,
+            borderRadius: '20px', padding: '4px 14px',
+            fontSize: '13px', fontWeight: 800, letterSpacing: '0.5px',
+            color: timerSeconds < 1800 ? '#ff8a80' : '#ffe066',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          }}>
+            <span>⏳</span>
+            <span>{formatHHMMSS(timerSeconds)}</span>
+            <span style={{ fontSize: '10px', opacity: 0.6, letterSpacing: '1px' }}>REMAINING</span>
+          </div>
+
           {isBoosted && (
-            <div style={{ fontSize: '14px', fontWeight: 900, color: '#00ffff', marginTop: '4px', background: 'rgba(0,100,100,0.6)', padding: '4px 16px', borderRadius: '16px', textShadow: '0 0 10px #00ffff', animation: 'pulse 1s infinite' }}>
-              ⚡ 2X BOOST ACTIVE ({Math.ceil(boostTimeLeft)}s)
-            </div>
-          )}
-          {hasVacuum && !isBoosted && (
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#4caf50', marginTop: '4px', background: 'rgba(0,0,0,0.4)', padding: '4px 12px', borderRadius: '12px' }}>
-              Hold RMB to Vacuum
+            <div style={{ fontSize: '13px', fontWeight: 900, color: '#00ffff', marginTop: '4px', background: 'rgba(0,100,100,0.6)', padding: '3px 14px', borderRadius: '16px', textShadow: '0 0 10px #00ffff', animation: 'pulse 1s infinite' }}>
+              ⚡ 2X BOOST ({Math.ceil(boostTimeLeft)}s)
             </div>
           )}
         </div>
@@ -238,6 +208,36 @@ export default function HUD() {
         <div><b>TAB</b> — Open Inventory & Shop</div>
         <div><b>ESC</b> — Release Cursor</div>
       </div>
+
+      {/* ── Modern Step Tutorial ── */}
+      <TutorialGuide tutorialFlags={tutorialFlags} />
+
+      {/* ── Voice-Over Subtitle ── */}
+      {subtitleText && (
+        <div style={{
+          position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(8, 6, 5, 0.82)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '30px',
+          padding: '11px 28px',
+          color: 'rgba(255,255,255,0.95)',
+          fontSize: '14px',
+          fontWeight: 500,
+          letterSpacing: '0.2px',
+          textAlign: 'center',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+          maxWidth: '600px',
+          pointerEvents: 'none',
+          zIndex: 110,
+          fontFamily: "'Inter', system-ui, sans-serif",
+          animation: 'fadeIn 0.2s ease-out',
+          display: 'flex', alignItems: 'center', gap: '10px',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#cd7f32', flexShrink: 0, boxShadow: '0 0 6px #cd7f32' }} />
+          {subtitleText}
+        </div>
+      )}
     </>
   );
 }

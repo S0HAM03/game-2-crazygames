@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const GAME_PHASES = { PICKUP_BAG: 'pickup_bag', PLAYING: 'playing' };
+export const GAME_PHASES = { START_MENU: 'start_menu', PICKUP_BAG: 'pickup_bag', PLAYING: 'playing' };
 
 const UPGRADE_CONFIGS = {
   bag: [
@@ -34,8 +34,8 @@ const UPGRADE_CONFIGS = {
 export const useGameStore = create(
   persist(
     (set, get) => ({
-  gamePhase: GAME_PHASES.PICKUP_BAG,
-  hasBag: false,
+      gamePhase: GAME_PHASES.START_MENU,
+      hasBag: false,
   coins: 0,
   leavesInBag: 0,
 
@@ -48,6 +48,105 @@ export const useGameStore = create(
   isSettingsOpen: false,
   isGameOver: false,
   notifications: [],
+  collectedLeafIds: [],
+  collectLeafIds: (ids) => set((state) => ({
+    collectedLeafIds: [...state.collectedLeafIds, ...ids]
+  })),
+
+  subtitleText: '',
+  tutorialFlags: {
+    equippedBag: false,
+    sweptLeaves: false,
+    soldLeaves: false,
+    visitedGarage: false
+  },
+
+  // 8-Hour Timer & Speedrun System (8 Hours = 28,800 Seconds)
+  maxTimerSeconds: 28800,
+  timerSeconds: 28800,
+  elapsedSeconds: 0,
+  isTimerExpired: false,
+  isVictory: false,
+  completionTime: 0,
+  worldRank: null,
+
+  tickTimer: (delta) => set((state) => {
+    if (state.isGameOver || state.isVictory || state.gamePhase === GAME_PHASES.START_MENU) return state;
+    
+    const newTimer = Math.max(0, state.timerSeconds - delta);
+    const newElapsed = state.elapsedSeconds + delta;
+    
+    if (newTimer <= 0 && !state.isTimerExpired) {
+      return {
+        timerSeconds: 0,
+        elapsedSeconds: newElapsed,
+        isTimerExpired: true,
+        isGameOver: true,
+      };
+    }
+    return {
+      timerSeconds: newTimer,
+      elapsedSeconds: newElapsed,
+    };
+  }),
+
+  triggerVictory: () => set((state) => {
+    const timeTaken = Math.round(state.elapsedSeconds);
+    // Calculate realistic worldwide rank based on completion time
+    let rank = Math.max(1, Math.floor((timeTaken / 240) + 1));
+    if (rank > 99) rank = 99;
+
+    return {
+      isVictory: true,
+      isGameOver: true,
+      completionTime: timeTaken,
+      worldRank: rank,
+    };
+  }),
+
+  resetTimerAndGame: () => set({
+    timerSeconds: 28800,
+    elapsedSeconds: 0,
+    isTimerExpired: false,
+    isVictory: false,
+    isGameOver: false,
+    completionTime: 0,
+    worldRank: null,
+  }),
+  setSubtitleText: (text) => set({ subtitleText: text }),
+  completeTutorialFlag: (flag) => set((state) => ({
+    tutorialFlags: { ...state.tutorialFlags, [flag]: true }
+  })),
+  triggerVoiceOver: (subtitle, textToSpeak) => {
+    try {
+      window.speechSynthesis.cancel();
+    } catch(e) {}
+    
+    set({ subtitleText: subtitle });
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak || subtitle);
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural')));
+    if (preferredVoice) utterance.voice = preferredVoice;
+    
+    utterance.rate = 1.05;
+    utterance.pitch = 0.95;
+    
+    utterance.onend = () => {
+      set({ subtitleText: '' });
+    };
+    utterance.onerror = () => {
+      set({ subtitleText: '' });
+    };
+    
+    window.speechSynthesis.speak(utterance);
+
+    setTimeout(() => {
+      if (get().subtitleText === subtitle) {
+        set({ subtitleText: '' });
+      }
+    }, 8000);
+  },
 
   setGameOver: (v) => set({ isGameOver: v }),
   resetYard: () => set((state) => ({
@@ -55,6 +154,13 @@ export const useGameStore = create(
     energy: state.maxEnergy,
     leavesInBag: 0,
     vacuumBattery: state.hasVacuum ? state.maxVacuumBattery : 90,
+    collectedLeafIds: [],
+    tutorialFlags: {
+      equippedBag: state.hasBag,
+      sweptLeaves: false,
+      soldLeaves: false,
+      visitedGarage: false
+    }
   })),
 
   // Settings
@@ -150,7 +256,7 @@ export const useGameStore = create(
     energy: Math.max(0, state.energy - amount)
   })),
 
-  // Vacuum System
+  // Vacuum & Broom System
   hasVacuum: false,
   hasBroom: false,
   isVacuuming: false,
@@ -160,17 +266,27 @@ export const useGameStore = create(
   consumeBattery: (amount) => set((state) => ({
     vacuumBattery: Math.max(0, state.vacuumBattery - amount)
   })),
+  activeTool: 'none', // 'none' | 'broom' | 'vacuum'
+  setActiveTool: (tool) => set({ activeTool: tool }),
   buyBattery: () => set((state) => {
     if (state.coins < 100 || state.vacuumBattery >= state.maxVacuumBattery) return state;
     return { coins: state.coins - 100, vacuumBattery: state.maxVacuumBattery };
   }),
   buyVacuum: () => set((state) => {
     if (state.coins < 500) return state;
-    return { coins: state.coins - 500, hasVacuum: true, vacuumBattery: state.maxVacuumBattery };
+    return { coins: state.coins - 500, hasVacuum: true, vacuumBattery: state.maxVacuumBattery, activeTool: 'vacuum' };
   }),
   buyBroom: () => set((state) => {
     if (state.coins < 80) return state;
-    return { coins: state.coins - 80, hasBroom: true };
+    return { coins: state.coins - 80, hasBroom: true, activeTool: 'broom' };
+  }),
+  equipBroom: () => set((state) => {
+    if (state.hasBroom) return { activeTool: 'broom' };
+    return state;
+  }),
+  equipVacuum: () => set((state) => {
+    if (state.hasVacuum) return { activeTool: 'vacuum' };
+    return state;
   }),
   setVacuuming: (val) => set({ isVacuuming: val }),
   setSweeping: (val) => set({ isSweeping: val }),
@@ -201,6 +317,7 @@ export const useGameStore = create(
 }),
 {
   name: 'leaf-collect-save',
+
   partialize: (state) => ({
     coins: state.coins,
     hasVacuum: state.hasVacuum,
@@ -210,8 +327,16 @@ export const useGameStore = create(
     vacuumPowerLevel: state.vacuumPowerLevel,
     totalCollected: state.totalCollected,
     hasBag: state.hasBag,
-    gamePhase: state.gamePhase,
     leavesInBag: state.leavesInBag,
+    collectedLeafIds: state.collectedLeafIds,
+    tutorialFlags: state.tutorialFlags,
+    activeTool: state.activeTool,
+    timerSeconds: state.timerSeconds,
+    elapsedSeconds: state.elapsedSeconds,
+    isVictory: state.isVictory,
+    completionTime: state.completionTime,
+    worldRank: state.worldRank,
   }),
 }
+
 ));

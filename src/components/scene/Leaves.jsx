@@ -168,46 +168,66 @@ function createLeafTexture(hexColor) {
 }
 
 const LEAF_COLORS = [
-  '#a93226', '#cb4335', '#d35400', '#dc7633',
-  '#e67e22', '#f39c12', '#f4d03f', '#b7950b',
-  '#a04000', '#922b21', '#82e0aa', '#ca6f1e',
+  '#f5b041', // Bright Golden Amber
+  '#f39c12', // Warm Autumn Yellow
+  '#eb984e', // Soft Ochre
+  '#e67e22', // Deep Orange
+  '#d35400', // Burnt Orange
+  '#dc7633', // Terracotta
+  '#c0392b', // Crimson Maple
+  '#a93226', // Chestnut Red
+  '#f7dc6f', // Light Birch Yellow
+  '#f0b27a', // Fallen Oak Tan
+  '#ca6f1e', // Warm Rust
+  '#e59866', // Dry Autumn Leaf
 ];
+
+function createSeededRandom(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
 
 const GARDEN_BOUNDS = { minX: -14.2, maxX: 14.2, minZ: -4.8, maxZ: 13.8 };
 const INITIAL_LEAF_COUNT = 4400;
 
 function generateLeafData(count) {
+  const state = useGameStore.getState();
+  const collectedSet = new Set(state.collectedLeafIds || []);
+  const random = createSeededRandom(12345);
   const data = [];
   let attempts = 0;
   while (data.length < count && attempts < count * 10) {
     attempts++;
-    const x = GARDEN_BOUNDS.minX + Math.random() * (GARDEN_BOUNDS.maxX - GARDEN_BOUNDS.minX);
-    const z = GARDEN_BOUNDS.minZ + Math.random() * (GARDEN_BOUNDS.maxZ - GARDEN_BOUNDS.minZ);
+    const x = GARDEN_BOUNDS.minX + random() * (GARDEN_BOUNDS.maxX - GARDEN_BOUNDS.minX);
+    const z = GARDEN_BOUNDS.minZ + random() * (GARDEN_BOUNDS.maxZ - GARDEN_BOUNDS.minZ);
 
     if (x > -10.2 && x < 6.2 && z < -3.6) continue;
 
-    // Resting tilt angles so leaves lay flat on grass blades with minor variations
-    const restTiltX = (Math.random() - 0.5) * 0.55; // up to 15 degrees tilt
-    const restTiltZ = (Math.random() - 0.5) * 0.55;
+    const restTiltX = (random() - 0.5) * 0.55;
+    const restTiltZ = (random() - 0.5) * 0.55;
+    const leafId = data.length;
 
     data.push({
-      id: Math.random().toString(36).slice(2),
+      id: leafId,
       x, z,
-      y: 0.012 + Math.random() * 0.015, // Raised slightly off ground for realistic shadow casting
+      y: 0.012 + random() * 0.015,
       restTiltX,
       restTiltZ,
       rotX: restTiltX,
-      rotY: Math.random() * Math.PI * 2,
+      rotY: random() * Math.PI * 2,
       rotZ: restTiltZ,
-      scale: 0.17 + Math.random() * 0.13, // Larger size
-      colorIndex: Math.floor(Math.random() * LEAF_COLORS.length),
+      scale: 0.17 + random() * 0.13,
+      colorIndex: Math.floor(random() * LEAF_COLORS.length),
       vx: 0,
       vy: 0,
       vz: 0,
       rotVx: 0,
       rotVy: 0,
       rotVz: 0,
-      collected: false,
+      collected: collectedSet.has(leafId),
     });
   }
   return data;
@@ -216,6 +236,21 @@ function generateLeafData(count) {
 export default function Leaves() {
   const [leavesData, setLeavesData] = useState(() => generateLeafData(INITIAL_LEAF_COUNT));
   const meshRefs = useRef([]);
+
+  const collectedLeafIds = useGameStore(s => s.collectedLeafIds);
+  const collectLeafIds = useGameStore(s => s.collectLeafIds);
+
+  // Sync collected status reactively (essential for tab reload / yard resets)
+  useEffect(() => {
+    const collectedSet = new Set(collectedLeafIds);
+    setLeavesData(prev => prev.map(l => {
+      const isCollectedNow = collectedSet.has(l.id);
+      if (l.collected !== isCollectedNow) {
+        return { ...l, collected: isCollectedNow };
+      }
+      return l;
+    }));
+  }, [collectedLeafIds]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const leafGeometries = useMemo(() => [
     createMapleGeometry(),
@@ -350,14 +385,23 @@ export default function Leaves() {
         closest.startZ = closest.z;
         lastSuckTime.current = t;
         state.consumeBattery(suckInterval);
+        if (!state.tutorialFlags.sweptLeaves) {
+          state.completeTutorialFlag('sweptLeaves');
+        }
       }
     }
 
-    // 2.5 Broom Sweeping Physics (Push leaves away from player front)
+    // 2.5 Broom Sweeping Physics (Tuned radius & gentle push force)
     const isSweeping = state.isSweeping;
     if (isSweeping && !isInsideHouse) {
-      const dirX = -Math.sin(camera.rotation.y);
-      const dirZ = -Math.cos(camera.rotation.y);
+      if (!state.tutorialFlags.sweptLeaves) {
+        state.completeTutorialFlag('sweptLeaves');
+      }
+      
+      const camDir = new THREE.Vector3();
+      camera.getWorldDirection(camDir);
+      const dirX = camDir.x;
+      const dirZ = camDir.z;
       
       for (const l of leavesData) {
         if (!l.collected && !l.isSucking) {
@@ -365,20 +409,111 @@ export default function Leaves() {
           const dz = l.z - cz;
           const dist = Math.sqrt(dx * dx + dz * dz);
           
-          if (dist < 2.6) { // Broom sweep radius
+          const SWEEP_RADIUS = 1.35; // Gentle, tactile broom cleaning radius
+          if (dist > 0.05 && dist < SWEEP_RADIUS) {
             const nx = dx / dist;
             const nz = dz / dist;
             const dot = nx * dirX + nz * dirZ;
             
             if (dot > 0.35) { // 70 degree cone in front of camera
-              const pushForce = (2.6 - dist) * 0.28;
-              l.vx += (dirX * 0.75 + nx * 0.25) * pushForce;
-              l.vz += (dirZ * 0.75 + nz * 0.25) * pushForce;
+              const pushForce = (SWEEP_RADIUS - dist) * 0.22;
+              l.vx += (dirX * 0.70 + nx * 0.30) * pushForce * 1.15;
+              l.vz += (dirZ * 0.70 + nz * 0.30) * pushForce * 1.15;
             }
           }
         }
       }
     }
+
+    // 2.6 Spatial Repulsion & Volumetric 3D Stack Mound Physics
+    // Prevents leaves from collapsing into the exact same spot and stacks them into a 3D pile
+    const CELL_SIZE = 0.4;
+    const grid = new Map();
+    
+    // Hash leaves into 2D spatial grid
+    for (let i = 0; i < leavesData.length; i++) {
+      const l = leavesData[i];
+      if (!l.collected && !l.isSucking) {
+        const gx = Math.floor(l.x / CELL_SIZE);
+        const gz = Math.floor(l.z / CELL_SIZE);
+        const key = `${gx},${gz}`;
+        let cell = grid.get(key);
+        if (!cell) {
+          cell = [];
+          grid.set(key, cell);
+        }
+        cell.push(l);
+      }
+    }
+
+    // Solve spatial repulsion & compute pile density for 3D stacking
+    for (const [key, cell] of grid.entries()) {
+      const [gx, gz] = key.split(',').map(Number);
+      
+      // Get all neighboring leaves in 3x3 adjacent grid cells
+      const neighbors = [];
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const nKey = `${gx + dx},${gz + dz}`;
+          const nCell = grid.get(nKey);
+          if (nCell) {
+            for (let k = 0; k < nCell.length; k++) neighbors.push(nCell[k]);
+          }
+        }
+      }
+
+      // Sort cell leaves deterministically by ID to determine stack order
+      cell.sort((a, b) => a.id - b.id);
+
+      for (let i = 0; i < cell.length; i++) {
+        const leafA = cell[i];
+        let stackRank = 0;
+
+        for (let j = 0; j < neighbors.length; j++) {
+          const leafB = neighbors[j];
+          if (leafA.id === leafB.id) continue;
+
+          const dx = leafA.x - leafB.x;
+          const dz = leafA.z - leafB.z;
+          const distSq = dx * dx + dz * dz;
+
+          if (distSq < 0.04) { // within 0.2m stack column
+            if (leafB.id < leafA.id) {
+              stackRank++;
+            }
+            if (distSq < 0.012 && distSq > 0.00001) { // subtle soft repulsion within 0.11m
+              const dist = Math.sqrt(distSq);
+              const repForce = (0.11 - dist) * 0.012;
+              const rnx = dx / dist;
+              const rnz = dz / dist;
+
+              leafA.vx += rnx * repForce;
+              leafA.vz += rnz * repForce;
+            }
+          }
+        }
+
+        // Layer 0 leaves sit 100% flush on ground (y = 0.008). Upper leaves stack in tight 0.005m steps up to 0.12m max height.
+        leafA.stackRank = stackRank;
+        leafA.targetY = 0.008 + Math.min(0.12, stackRank * 0.005);
+      }
+    }
+
+    // Obstacle lists for leaf collision (strictly outside house footprint)
+    const LEAF_TREE_OBSTACLES = [
+      { x: -14.8, z: 2.0, r: 0.8 },
+      { x: -14.8, z: 8.0, r: 0.8 },
+      { x: -7.5, z: -14.5, r: 0.8 },
+      { x: -1.5, z: -14.5, r: 0.8 },
+      { x: 4.5, z: -14.5, r: 0.8 },
+      { x: 13.5, z: -5.0, r: 0.8 },
+      { x: 13.5, z: 1.5, r: 0.8 },
+      { x: 13.5, z: 7.5, r: 0.8 },
+      { x: 8.5, z: 9.5, r: 0.7 },
+      { x: 11.5, z: 11.0, r: 0.7 },
+      { x: -13.2, z: 5.0, r: 0.6 }, // Birdbath
+      { x: 2.5, z: 13.8, r: 0.8 },  // Compost bin
+    ];
 
     // 3. Update matrices and animations
     LEAF_COLORS.forEach((_, colorIdx) => {
@@ -398,9 +533,8 @@ export default function Leaves() {
             collectedQueue.current.push(item.id);
           } else {
             const camPos = camera.position;
-            // Swirl spiral physics math
-            const angle = item.suckProgress * Math.PI * 6.0; // 3 full loops
-            const radius = (1.0 - item.suckProgress) * 0.85; // spiral gets tighter
+            const angle = item.suckProgress * Math.PI * 6.0;
+            const radius = (1.0 - item.suckProgress) * 0.85;
             const swirlX = Math.sin(angle) * radius;
             const swirlZ = Math.cos(angle) * radius;
             const swirlY = Math.sin(angle * 2) * radius * 0.25;
@@ -417,27 +551,54 @@ export default function Leaves() {
             );
           }
         } else {
-          // Broom physics integration (Decelerate and boundaries clamp)
+          // Broom physics integration (Decelerate and obstacle boundary collision)
           if (Math.abs(item.vx) > 0.001 || Math.abs(item.vz) > 0.001) {
-            item.x += item.vx * delta;
-            item.z += item.vz * delta;
+            const nextX = item.x + item.vx * delta;
+            const nextZ = item.z + item.vz * delta;
+
+            // Tree & round obstacle collision for leaves
+            let hitTree = false;
+            for (const obs of LEAF_TREE_OBSTACLES) {
+              const dx = nextX - obs.x;
+              const dz = nextZ - obs.z;
+              if (dx * dx + dz * dz < obs.r * obs.r) {
+                hitTree = true;
+                item.vx = -item.vx * 0.3;
+                item.vz = -item.vz * 0.3;
+                break;
+              }
+            }
+
+            if (!hitTree) {
+              item.x = nextX;
+              item.z = nextZ;
+            }
             
             // Decelerate with friction
             item.vx *= Math.max(0, 1 - delta * 4.5);
             item.vz *= Math.max(0, 1 - delta * 4.5);
             
-            // Bounds clamping
+            // Outer Garden Bounds clamping
             item.x = Math.max(GARDEN_BOUNDS.minX, Math.min(GARDEN_BOUNDS.maxX, item.x));
             item.z = Math.max(GARDEN_BOUNDS.minZ, Math.min(GARDEN_BOUNDS.maxZ, item.z));
             
-            // House bounce
+            // House wall bounce for leaves
             if (item.x > -10.2 && item.x < 6.2 && item.z < -3.6) {
               item.z = -3.6;
               item.vz = -item.vz * 0.5;
             }
           }
+
+          // Smoothly stack height (Y) and subtle 3D tilt based on stack rank
+          const pileY = item.targetY || 0.008;
+          item.y = THREE.MathUtils.lerp(item.y, pileY, delta * 8.0);
+
+          const rank = item.stackRank || 0;
+          const pileTiltX = rank > 0 ? item.restTiltX + Math.sin(item.id * 1.5) * Math.min(0.35, rank * 0.04) : item.restTiltX;
+          const pileTiltZ = rank > 0 ? item.restTiltZ + Math.cos(item.id * 1.5) * Math.min(0.35, rank * 0.04) : item.restTiltZ;
+
           dummy.position.set(item.x, item.y, item.z);
-          dummy.rotation.set(item.rotX, item.rotY + item.vx * 0.1, item.rotZ);
+          dummy.rotation.set(pileTiltX, item.rotY + item.vx * 0.1, pileTiltZ);
         }
 
         if (item.collected) {
@@ -464,7 +625,7 @@ export default function Leaves() {
         if (!l.collected) uncollected++;
       }
       if (uncollected === 0 && state.leavesInBag === 0 && !state.isGameOver) {
-        state.setGameOver(true);
+        state.triggerVictory();
         if (document.pointerLockElement) document.exitPointerLock();
       }
     }
@@ -481,6 +642,9 @@ export default function Leaves() {
         state.addLeaves(actualCount);
         const flushSet = new Set(idsToFlush.slice(0, actualCount));
         
+        // Add collected IDs to Zustand store to auto-save them
+        state.collectLeafIds(idsToFlush.slice(0, actualCount));
+
         setLeavesData(prev => prev.map(l => {
           if (flushSet.has(l.id)) return { ...l, collected: true, isSucking: false };
           return l;
@@ -536,6 +700,9 @@ export default function Leaves() {
     playLeafPick();
     state.addLeaves(actualCount);
     state.addNotification(`+${actualCount} 🍃`);
+
+    // Add collected IDs to Zustand store to auto-save them
+    state.collectLeafIds(toCollectIds.slice(0, actualCount));
 
     setLeavesData(prev => prev.map(l => collectedSet.has(l.id) ? { ...l, collected: true } : l));
   }, [canCollect, leavesByColor, leavesData]);

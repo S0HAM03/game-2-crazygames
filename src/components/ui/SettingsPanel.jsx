@@ -89,11 +89,33 @@ export default function SettingsPanel() {
             color: '#fff', fontWeight: 800, fontSize: '15px',
             cursor: 'pointer',
             transition: 'transform 0.1s',
+            marginBottom: '10px'
           }}
           onMouseEnter={e => e.target.style.transform = 'scale(1.02)'}
           onMouseLeave={e => e.target.style.transform = 'scale(1)'}
         >
           Save & Close
+        </button>
+
+        <button
+          onClick={() => {
+            if (window.confirm("⚠️ Are you sure you want to delete all your progress and restart the game?")) {
+              localStorage.removeItem('leaf-collect-save');
+              window.location.reload();
+            }
+          }}
+          style={{
+            width: '100%', padding: '12px',
+            background: 'linear-gradient(135deg, #ef5350, #c62828)',
+            border: 'none', borderRadius: '10px',
+            color: '#fff', fontWeight: 800, fontSize: '15px',
+            cursor: 'pointer',
+            transition: 'transform 0.1s',
+          }}
+          onMouseEnter={e => e.target.style.transform = 'scale(1.02)'}
+          onMouseLeave={e => e.target.style.transform = 'scale(1)'}
+        >
+          🗑️ Reset Progress
         </button>
       </div>
     </div>

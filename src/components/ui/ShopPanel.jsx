@@ -12,6 +12,12 @@ export default function ShopPanel() {
   const vacuumPowerLevel = useGameStore(s => s.vacuumPowerLevel);
   const upgradeVacuumPower = useGameStore(s => s.upgradeVacuumPower);
   const hasVacuum = useGameStore(s => s.hasVacuum);
+  const buyVacuum = useGameStore(s => s.buyVacuum);
+  const equipVacuum = useGameStore(s => s.equipVacuum);
+  const hasBroom = useGameStore(s => s.hasBroom);
+  const buyBroom = useGameStore(s => s.buyBroom);
+  const equipBroom = useGameStore(s => s.equipBroom);
+  const activeTool = useGameStore(s => s.activeTool);
   const rewardCoins = useGameStore(s => s.rewardCoins);
   const addNotification = useGameStore(s => s.addNotification);
 
@@ -193,7 +199,105 @@ export default function ShopPanel() {
           maxLevel={POWER_TIERS.length - 1}
         />
 
-        {/* Vacuum Power */}
+        {/* Wooden Broom Purchase / Equip Card */}
+        <div style={{
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,200,50,0.2)',
+          borderRadius: '14px', padding: '14px 16px', marginBottom: '14px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '15px' }}>🧹 Wooden Broom</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+              {hasBroom ? (activeTool === 'broom' ? 'Equipped in hand' : 'Owned — Click to equip') : 'Sweeps leaves into piles'}
+            </div>
+          </div>
+          {hasBroom ? (
+            <button
+              onClick={() => {
+                equipBroom();
+                addNotification('🧹 Wooden Broom equipped!');
+              }}
+              style={{
+                padding: '8px 14px', borderRadius: '10px', border: 'none',
+                background: activeTool === 'broom' ? '#2e7d32' : 'linear-gradient(135deg, #d35400, #e67e22)',
+                color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+              }}
+            >
+              {activeTool === 'broom' ? '✅ Equipped' : 'Equip (1)'}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (coins >= 80) {
+                  buyBroom();
+                  addNotification('🎉 Wooden Broom Purchased & Equipped!');
+                } else {
+                  addNotification('❌ Need 80 🪙 to buy Broom!');
+                }
+              }}
+              disabled={coins < 80}
+              style={{
+                padding: '8px 14px', borderRadius: '10px', border: 'none',
+                background: coins >= 80 ? 'linear-gradient(135deg, #e67e22, #d35400)' : '#333',
+                color: coins >= 80 ? '#fff' : 'rgba(255,255,255,0.4)',
+                fontWeight: 700, fontSize: '13px', cursor: coins >= 80 ? 'pointer' : 'not-allowed',
+              }}
+            >
+              🪙 80 Buy
+            </button>
+          )}
+        </div>
+
+        {/* Vacuum Cleaner Purchase / Equip Card */}
+        <div style={{
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,200,50,0.2)',
+          borderRadius: '14px', padding: '14px 16px', marginBottom: '14px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '15px' }}>💨 Vacuum Cleaner</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+              {hasVacuum ? (activeTool === 'vacuum' ? 'Equipped in hand' : 'Owned — Click to equip') : 'Sucks leaves directly into bag'}
+            </div>
+          </div>
+          {hasVacuum ? (
+            <button
+              onClick={() => {
+                equipVacuum();
+                addNotification('💨 Vacuum Cleaner equipped!');
+              }}
+              style={{
+                padding: '8px 14px', borderRadius: '10px', border: 'none',
+                background: activeTool === 'vacuum' ? '#2e7d32' : 'linear-gradient(135deg, #2980b9, #3498db)',
+                color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+              }}
+            >
+              {activeTool === 'vacuum' ? '✅ Equipped' : 'Equip (2)'}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (coins >= 500) {
+                  buyVacuum();
+                  addNotification('🎉 Vacuum Purchased & Equipped!');
+                } else {
+                  addNotification('❌ Need 500 🪙 to buy Vacuum!');
+                }
+              }}
+              disabled={coins < 500}
+              style={{
+                padding: '8px 14px', borderRadius: '10px', border: 'none',
+                background: coins >= 500 ? 'linear-gradient(135deg, #3498db, #2980b9)' : '#333',
+                color: coins >= 500 ? '#fff' : 'rgba(255,255,255,0.4)',
+                fontWeight: 700, fontSize: '13px', cursor: coins >= 500 ? 'pointer' : 'not-allowed',
+              }}
+            >
+              🪙 500 Buy
+            </button>
+          )}
+        </div>
+
+        {/* Vacuum Power Upgrade */}
         {hasVacuum && (
           <UpgradeCard
             icon="💨"

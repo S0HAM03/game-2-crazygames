@@ -78,4 +78,11 @@ export function handleBagClick(pickupBag, addNotification) {
   playBagPickup();
   pickupBag();
   addNotification('🎒 Bag equipped! Now clean up the fallen leaves!');
+  
+  const state = useGameStore.getState();
+  state.completeTutorialFlag('equippedBag');
+  state.triggerVoiceOver(
+    "Got my bag. Let's start sweeping. Hold Left Click to sweep, or click leaves to pick by hand.",
+    "Got my bag. Let's start sweeping. Hold Left Click to sweep, or click leaves to pick by hand."
+  );
 }

@@ -126,9 +126,21 @@ export default function CompostBin() {
       addNotification('Your bag is empty!');
       return;
     }
+    
+    const state = useGameStore.getState();
+    const isFirstSell = !state.tutorialFlags.soldLeaves;
+
     playBinDeposit(leavesInBag);
     addNotification(`+${leavesInBag} 🪙 Leaves sold!`);
     sellLeaves();
+
+    if (isFirstSell) {
+      state.completeTutorialFlag('soldLeaves');
+      state.triggerVoiceOver(
+        "Nice, some coins in my pocket. Time to check the upgrades in my inventory (TAB) or the garage!",
+        "Nice, some coins in my pocket. Time to check the upgrades in my inventory or the garage!"
+      );
+    }
   };
 
   return (
