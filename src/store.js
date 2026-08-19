@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export const GAME_PHASES = { PICKUP_BAG: 'pickup_bag', PLAYING: 'playing' };
 
@@ -30,7 +31,9 @@ const UPGRADE_CONFIGS = {
   ],
 };
 
-export const useGameStore = create((set, get) => ({
+export const useGameStore = create(
+  persist(
+    (set, get) => ({
   gamePhase: GAME_PHASES.PICKUP_BAG,
   hasBag: false,
   coins: 0,
@@ -195,4 +198,20 @@ export const useGameStore = create((set, get) => ({
       set((state) => ({ notifications: state.notifications.filter(n => n.id !== id) }));
     }, 2000);
   },
-}));
+}),
+{
+  name: 'leaf-collect-save',
+  partialize: (state) => ({
+    coins: state.coins,
+    hasVacuum: state.hasVacuum,
+    hasBroom: state.hasBroom,
+    bagLevel: state.bagLevel,
+    powerLevel: state.powerLevel,
+    vacuumPowerLevel: state.vacuumPowerLevel,
+    totalCollected: state.totalCollected,
+    hasBag: state.hasBag,
+    gamePhase: state.gamePhase,
+    leavesInBag: state.leavesInBag,
+  }),
+}
+));
